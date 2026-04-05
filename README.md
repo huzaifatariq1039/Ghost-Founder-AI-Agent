@@ -385,7 +385,7 @@ ghost-founder-v3/
 
 ## 🧑‍💻 Built By
 
-**Huzaifa** — CS student at IST Islamabad, founder of [WebCorps](https://webcorps.io), building PulseQ (AI in Healthcare) and Pashto GPT.
+**Huzaifa Tariq** 
 
 I build things that do the work I don't have time for. This is one of them.
 
