@@ -1,0 +1,1342 @@
+{
+  "name": "Ghost-Founder v3.0 - Multi-Agent System",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "node-schedule-trigger",
+      "name": "Daily Strategy Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ghost-founder-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-trigger",
+      "name": "Manual/WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "approve-check",
+              "leftValue": "={{ $json.body.message }}",
+              "rightValue": "!Approve",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-approval-check",
+      "name": "Check !Approve Signal",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [240, 500]
+    },
+    {
+      "parameters": {
+        "url": "https://api.apify.com/v2/acts/nwua9Gu5YrADL7ZDj/runs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "searchStringsArray",
+              "value": "=[\"AI healthcare\", \"AI space tech\", \"LLM startup\", \"HealthTech Pakistan\", \"AI automation 2026\"]"
+            },
+            {
+              "name": "maxCrawledPlacesPerSearch",
+              "value": "=10"
+            },
+            {
+              "name": "language",
+              "value": "en"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-apify-trends",
+      "name": "Apify - Scrape Trending Topics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "apify-api-key",
+          "name": "Apify API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.apify.com/v2/acts/nwua9Gu5YrADL7ZDj/runs/last/dataset/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "node-apify-results",
+      "name": "Apify - Fetch Scraped Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "apify-api-key",
+          "name": "Apify API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Wait 15 seconds for Apify actor to complete\nawait new Promise(resolve => setTimeout(resolve, 15000));\nreturn $input.all();"
+      },
+      "id": "node-wait-apify",
+      "name": "Wait for Apify Actor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $credentials.anthropicApiKey }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-opus-4-6\",\n  \"max_tokens\": 2000,\n  \"system\": \"You are The Strategist — a world-class personal branding expert for engineer-entrepreneurs. Your client is Huzaifa, a CS student at IST Islamabad, founder of WebCorps digital agency, and an AI/automation specialist with Pashtun roots. His brand voice is understated, inward-facing, authentic — 'me vs. me' mindset, NOT performative. He has real projects: PulseQ healthcare AI startup (onboarding at Rufaydah Medical Complex), Pashto GPT, n8n automation agents, GDG community work. His audience is Pakistani tech ecosystem + global AI/HealthTech investors and clients. Output ONLY valid JSON with keys: weekly_theme, content_pillars (array of 3), platform_strategy (object with linkedin, x_twitter, instagram keys), tone_direction, cta_of_the_week.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Trending data from web scrape: {{ JSON.stringify($('Apify - Fetch Scraped Results').item.json).substring(0, 3000) }}\\n\\nToday's date: {{ $now.toISODate() }}\\n\\nPerform a weekly strategy audit. What is the single most powerful narrative Huzaifa should own this week based on trending topics? Cross-reference with his projects (PulseQ, WebCorps, Pashto GPT, n8n automation). Output the JSON strategy object.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "node-strategist-claude",
+      "name": "The Strategist (Claude Opus 4.6)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "anthropic-api-key",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Strategist (Claude) response\nconst response = $input.first().json;\nlet strategyText = '';\n\nif (response.content && Array.isArray(response.content)) {\n  strategyText = response.content\n    .filter(b => b.type === 'text')\n    .map(b => b.text)\n    .join('');\n}\n\n// Extract JSON from response\nlet strategy = {};\ntry {\n  const jsonMatch = strategyText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    strategy = JSON.parse(jsonMatch[0]);\n  }\n} catch(e) {\n  strategy = { \n    weekly_theme: strategyText.substring(0, 200),\n    raw_response: strategyText,\n    parse_error: e.message\n  };\n}\n\nreturn [{ json: { strategy, raw_strategy: strategyText } }];"
+      },
+      "id": "node-parse-strategy",
+      "name": "Parse Strategist Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{ $credentials.geminiApiKey }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"role\": \"user\",\n      \"parts\": [\n        {\n          \"text\": \"You are The Archivist — a technical fact-checker and context expert for Huzaifa's personal brand. Your mission: ensure every post is technically accurate and grounded in his REAL projects.\\n\\nHuzaifa's Technical Portfolio Context:\\n- PulseQ: AI-powered healthcare startup, onboarding hospitals at Rufaydah Medical Complex, Islamabad. Focus: clinical workflow automation, patient data AI.\\n- WebCorps: Digital agency offering WordPress, custom web apps, WooCommerce, AI automation, n8n workflows, Figma UI/UX, SEO. Clients: US local businesses and Pakistan SMEs.\\n- Pashto GPT: NLP project building language models for low-resource Pashto language.\\n- n8n Automation: Lead-hunting agents using Apify + Groq Llama + Gmail + Google Sheets. Real experience with multi-agent orchestration.\\n- GDG Islamabad: Community tech events, speaker/organizer.\\n- IST Student (ID: 230201039): ML with pandas/numpy, Software Testing QA, Compiler Theory.\\n\\nThis week's strategy from The Strategist:\\n{{ JSON.stringify($('Parse Strategist Output').item.json.strategy) }}\\n\\nTrending topics detected:\\n{{ JSON.stringify($('Apify - Fetch Scraped Results').item.json).substring(0, 2000) }}\\n\\nTask: Generate a TECHNICALLY VERIFIED content brief. For each content pillar in the strategy, identify:\\n1. Which SPECIFIC real project/experience from Huzaifa's portfolio maps to it\\n2. What CONCRETE technical data points or milestones he can cite (be honest - don't invent metrics)\\n3. What TECHNICAL DEPTH angle differentiates this from generic AI content\\n\\nOutput ONLY valid JSON with key: content_briefs (array of objects with: pillar, project_tie_in, technical_angles, authenticity_hooks, avoid_cliches)\"\n        }\n      ]\n    }\n  ],\n  \"generationConfig\": {\n    \"temperature\": 0.4,\n    \"maxOutputTokens\": 2000\n  }\n}",
+        "options": {}
+      },
+      "id": "node-archivist-gemini",
+      "name": "The Archivist (Gemini Pro)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gemini-api-key",
+          "name": "Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Archivist (Gemini) response\nconst response = $input.first().json;\nlet archivistText = '';\n\ntry {\n  archivistText = response.candidates[0].content.parts[0].text;\n} catch(e) {\n  archivistText = JSON.stringify(response);\n}\n\nlet contentBriefs = {};\ntry {\n  const jsonMatch = archivistText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    contentBriefs = JSON.parse(jsonMatch[0]);\n  }\n} catch(e) {\n  contentBriefs = { raw: archivistText };\n}\n\n// Pass through accumulated context\nconst strategy = $('Parse Strategist Output').item.json.strategy;\n\nreturn [{ \n  json: { \n    strategy, \n    contentBriefs,\n    raw_archivist: archivistText\n  } \n}];"
+      },
+      "id": "node-parse-archivist",
+      "name": "Parse Archivist Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.groqApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-4-scout-17b-16e-instruct\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are The Creative Agent for Huzaifa, a Pakistani engineer-entrepreneur. Write authentic, non-generic social media content. His voice: understated, technically grounded, reflective ('me vs. me' not 'look at me'). Avoid: AI slop buzzwords, fake humility, over-motivational fluff. Use: real technical insights, honest journey moments, Pashto/Pakistani cultural authenticity when natural.\\n\\nAlways output ONLY valid JSON.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Strategy: {{ JSON.stringify($json.strategy) }}\\n\\nContent Briefs from Technical Archivist: {{ JSON.stringify($json.contentBriefs).substring(0, 3000) }}\\n\\nGenerate a FULL content package. Output JSON with keys:\\n- linkedin_post: { hook, body (3-4 paragraphs), cta, hashtags (5 max), format_recommendation }\\n- x_thread: { tweet_1 (hook), tweet_2, tweet_3, tweet_4, tweet_5 (cta) }\\n- instagram_caption: { caption, hashtags (8 max), visual_direction }\\n- visual_prompt: a detailed image generation prompt for authentic photo editing (describe Huzaifa in a professional setting relevant to the content)\\n- shadow_ban_risk: low/medium/high with reason\"\n    }\n  ],\n  \"temperature\": 0.75,\n  \"max_tokens\": 3000\n}",
+        "options": {}
+      },
+      "id": "node-creative-groq",
+      "name": "Creative Agent (Llama 4 on Groq)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1920, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "groq-api-key",
+          "name": "Groq API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Creative Agent (Groq/Llama) response\nconst response = $input.first().json;\nlet creativeText = '';\n\ntry {\n  creativeText = response.choices[0].message.content;\n} catch(e) {\n  creativeText = JSON.stringify(response);\n}\n\nlet contentPackage = {};\ntry {\n  const jsonMatch = creativeText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    contentPackage = JSON.parse(jsonMatch[0]);\n  }\n} catch(e) {\n  contentPackage = { raw: creativeText };\n}\n\n// Assemble full package\nconst incomingJson = $input.first().json;\n\nreturn [{ \n  json: { \n    strategy: incomingJson.strategy,\n    contentBriefs: incomingJson.contentBriefs,\n    contentPackage,\n    timestamp: new Date().toISOString(),\n    weekOf: new Date().toISOLocaleDateString ? new Date().toLocaleDateString('en-PK') : new Date().toDateString()\n  } \n}];"
+      },
+      "id": "node-parse-creative",
+      "name": "Parse Creative Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2160, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.groqApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-4-scout-17b-16e-instruct\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the Validator Agent. Analyze social media content for: shadow-ban risks, technical accuracy, authenticity score, and platform best practices. Be ruthlessly honest. Output ONLY valid JSON.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Validate this content package for Huzaifa's LinkedIn/X/Instagram:\\n\\n{{ JSON.stringify($json.contentPackage).substring(0, 3000) }}\\n\\nOutput JSON with keys:\\n- validation_score: 0-100\\n- shadow_ban_risk: low/medium/high\\n- shadow_ban_reasons: array of strings\\n- technical_accuracy_issues: array of strings (empty if none)\\n- authenticity_score: 0-100 with explanation\\n- dwell_time_simulation: estimated_seconds_linkedin, estimated_seconds_x\\n- recommended_post_time_pk: best time in Pakistan timezone\\n- green_flags: what makes this content strong\\n- red_flags: what to fix before posting\\n- final_verdict: approve/revise/reject\"\n    }\n  ],\n  \"temperature\": 0.2,\n  \"max_tokens\": 1500\n}",
+        "options": {}
+      },
+      "id": "node-validator",
+      "name": "Validator Agent (Shadow-Ban Check)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2400, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "groq-api-key",
+          "name": "Groq API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Validator response and assemble final package\nconst response = $input.first().json;\nlet validationText = '';\n\ntry {\n  validationText = response.choices[0].message.content;\n} catch(e) {\n  validationText = JSON.stringify(response);\n}\n\nlet validation = {};\ntry {\n  const jsonMatch = validationText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    validation = JSON.parse(jsonMatch[0]);\n  }\n} catch(e) {\n  validation = { raw: validationText, final_verdict: 'revise' };\n}\n\nconst incomingJson = $input.first().json;\n\n// Build WhatsApp preview message\nconst pkg = incomingJson.contentPackage || {};\nconst strat = incomingJson.strategy || {};\n\nconst whatsappPreview = `🤖 *Ghost-Founder v3.0 — Weekly Content Package*\n📅 ${new Date().toLocaleDateString('en-PK', {weekday:'long', year:'numeric', month:'long', day:'numeric'})}\n\n🎯 *Weekly Theme:* ${strat.weekly_theme || 'Not set'}\n\n✅ *Validation Score:* ${validation.validation_score || 'N/A'}/100\n⚠️ *Shadow-Ban Risk:* ${validation.shadow_ban_risk || 'Unknown'}\n🎭 *Authenticity:* ${validation.authenticity_score || 'N/A'}/100\n⏰ *Best Post Time (PK):* ${validation.recommended_post_time_pk || 'N/A'}\n\n📝 *LinkedIn Hook:*\n${(pkg.linkedin_post?.hook || 'No hook generated').substring(0, 200)}\n\n🐦 *X Thread Start:*\n${(pkg.x_thread?.tweet_1 || 'No tweet generated').substring(0, 200)}\n\n📊 *Verdict:* ${(validation.final_verdict || 'PENDING').toUpperCase()}\n\n${validation.final_verdict === 'approve' ? '👇 Reply *!Approve* to publish all platforms' : '⚡ Content needs revision. Check Google Sheets for details.'}`;\n\nreturn [{ \n  json: { \n    ...incomingJson,\n    validation,\n    whatsappPreview,\n    readyToPost: validation.final_verdict === 'approve'\n  } \n}];"
+      },
+      "id": "node-build-preview",
+      "name": "Build WhatsApp Preview",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 200]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Content-Queue",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.timestamp }}",
+            "Week_Theme": "={{ $json.strategy.weekly_theme }}",
+            "Validation_Score": "={{ $json.validation.validation_score }}",
+            "Shadow_Ban_Risk": "={{ $json.validation.shadow_ban_risk }}",
+            "Authenticity_Score": "={{ $json.validation.authenticity_score }}",
+            "Verdict": "={{ $json.validation.final_verdict }}",
+            "LinkedIn_Hook": "={{ $json.contentPackage.linkedin_post?.hook }}",
+            "LinkedIn_Body": "={{ $json.contentPackage.linkedin_post?.body }}",
+            "LinkedIn_Hashtags": "={{ JSON.stringify($json.contentPackage.linkedin_post?.hashtags) }}",
+            "X_Thread": "={{ JSON.stringify($json.contentPackage.x_thread) }}",
+            "Instagram_Caption": "={{ $json.contentPackage.instagram_caption?.caption }}",
+            "Visual_Prompt": "={{ $json.contentPackage.visual_prompt }}",
+            "Best_Post_Time": "={{ $json.validation.recommended_post_time_pk }}",
+            "Status": "=PENDING_APPROVAL",
+            "Green_Flags": "={{ JSON.stringify($json.validation.green_flags) }}",
+            "Red_Flags": "={{ JSON.stringify($json.validation.red_flags) }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-sheets-log",
+      "name": "Log to Google Sheets (Content-Queue)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [2880, 100],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-creds",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.callmebot.com/whatsapp.php?phone=YOUR_PHONE_NUMBER&text={{ encodeURIComponent($json.whatsappPreview) }}&apikey=YOUR_CALLMEBOT_APIKEY",
+        "options": {}
+      },
+      "id": "node-whatsapp-preview",
+      "name": "Send WhatsApp Preview",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2880, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "ready-check",
+              "leftValue": "={{ $json.readyToPost }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-post-gate",
+      "name": "Approval Gate (Auto or Manual)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [3120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the latest approved content from the pipeline or from webhook approval\nconst isWebhookApproval = $('Check !Approve Signal').item !== undefined;\n\n// Try to get content from the sheet or from memory\n// In production, this would fetch the pending item from Google Sheets\nconst contentData = $('Build WhatsApp Preview').first()?.json || {};\n\nreturn [{ json: contentData }];"
+      },
+      "id": "node-fetch-approved-content",
+      "name": "Fetch Approved Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3360, 400]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "text": "={{ $json.contentPackage?.linkedin_post?.body || 'Post content pending' }}\n\n{{ ($json.contentPackage?.linkedin_post?.hashtags || []).join(' ') }}",
+        "additionalFields": {}
+      },
+      "id": "node-linkedin-post",
+      "name": "Post to LinkedIn",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [3600, 200],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "linkedin-oauth",
+          "name": "LinkedIn OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "tweet",
+        "operation": "create",
+        "text": "={{ $json.contentPackage?.x_thread?.tweet_1 || 'Tweet pending' }}"
+      },
+      "id": "node-x-post",
+      "name": "Post to X (Twitter) - Thread Start",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [3600, 350],
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "twitter-oauth",
+          "name": "X / Twitter OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "tweet",
+        "operation": "create",
+        "text": "={{ $json.contentPackage?.x_thread?.tweet_2 }}",
+        "additionalFields": {
+          "inReplyToStatusId": "={{ $('Post to X (Twitter) - Thread Start').item.json.id }}"
+        }
+      },
+      "id": "node-x-tweet-2",
+      "name": "X Thread - Tweet 2",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [3840, 280],
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "twitter-oauth",
+          "name": "X / Twitter OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "tweet",
+        "operation": "create",
+        "text": "={{ $json.contentPackage?.x_thread?.tweet_3 }}",
+        "additionalFields": {
+          "inReplyToStatusId": "={{ $('X Thread - Tweet 2').item.json.id }}"
+        }
+      },
+      "id": "node-x-tweet-3",
+      "name": "X Thread - Tweet 3",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [4080, 280],
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "twitter-oauth",
+          "name": "X / Twitter OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "tweet",
+        "operation": "create",
+        "text": "={{ $json.contentPackage?.x_thread?.tweet_4 }}",
+        "additionalFields": {
+          "inReplyToStatusId": "={{ $('X Thread - Tweet 3').item.json.id }}"
+        }
+      },
+      "id": "node-x-tweet-4",
+      "name": "X Thread - Tweet 4",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [4320, 280],
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "twitter-oauth",
+          "name": "X / Twitter OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "tweet",
+        "operation": "create",
+        "text": "={{ $json.contentPackage?.x_thread?.tweet_5 }}",
+        "additionalFields": {
+          "inReplyToStatusId": "={{ $('X Thread - Tweet 4').item.json.id }}"
+        }
+      },
+      "id": "node-x-tweet-5",
+      "name": "X Thread - Tweet 5 (CTA)",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [4560, 280],
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "twitter-oauth",
+          "name": "X / Twitter OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Content-Queue",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "=PUBLISHED",
+            "Published_At": "={{ new Date().toISOString() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-sheets-update-status",
+      "name": "Update Sheet: Mark Published",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [4800, 280],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-creds",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.callmebot.com/whatsapp.php?phone=YOUR_PHONE_NUMBER&text={{ encodeURIComponent('✅ Ghost-Founder v3.0 — Content PUBLISHED\\n\\nLinkedIn ✅\\nX Thread (5 tweets) ✅\\n\\nTheme: ' + ($json.strategy?.weekly_theme || 'N/A') + '\\n\\n📊 Check your Google Sheets for full analytics.') }}&apikey=YOUR_CALLMEBOT_APIKEY",
+        "options": {}
+      },
+      "id": "node-whatsapp-confirm",
+      "name": "WhatsApp: Publish Confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5040, 280]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "engagement-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-engagement-webhook",
+      "name": "Engagement Webhook (Comments/DMs)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 700]
+    },
+    {
+      "parameters": {
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.groqApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-4-scout-17b-16e-instruct\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the Smart Triage Agent for Huzaifa's social media engagement. Classify incoming interactions rapidly. Output ONLY valid JSON.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Classify this engagement:\\n\\nPlatform: {{ $json.body.platform }}\\nSender: {{ $json.body.sender_name }}\\nSender Profile: {{ JSON.stringify($json.body.sender_profile || {}) }}\\nMessage/Comment: {{ $json.body.message }}\\nConnection Count: {{ $json.body.sender_connections || 'unknown' }}\\nSender Bio: {{ $json.body.sender_bio || 'unknown' }}\\n\\nClassify as:\\n- tier: 'high_value' (investor/potential client/influential person) OR 'low_value' (general engagement)\\n- intent: 'hiring' / 'investing' / 'collaboration' / 'sales' / 'learning' / 'spam' / 'general'\\n- who_is_this: one sentence summary of who this person likely is\\n- urgency: 'immediate' / 'today' / 'this_week' / 'low'\\n- reply_tone: 'formal_personalized' / 'witty_brief' / 'technical' / 'warm_casual'\\n- suggested_reply: the actual reply text (keep it authentic to Huzaifa's voice — understated, not sycophantic)\\n- draft_dm: if high_value, a personalized DM opening (otherwise null)\"\n    }\n  ],\n  \"temperature\": 0.5,\n  \"max_tokens\": 800\n}",
+        "options": {}
+      },
+      "id": "node-triage-speedster",
+      "name": "Smart Triage (Llama 4 - Fast)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 700],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "groq-api-key",
+          "name": "Groq API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet triageText = '';\n\ntry {\n  triageText = response.choices[0].message.content;\n} catch(e) {\n  triageText = JSON.stringify(response);\n}\n\nlet triage = {};\ntry {\n  const jsonMatch = triageText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    triage = JSON.parse(jsonMatch[0]);\n  }\n} catch(e) {\n  triage = { tier: 'low_value', raw: triageText };\n}\n\nconst inbound = $('Engagement Webhook (Comments/DMs)').item.json.body;\n\nreturn [{ \n  json: { \n    triage, \n    inbound,\n    is_high_value: triage.tier === 'high_value'\n  } \n}];"
+      },
+      "id": "node-parse-triage",
+      "name": "Parse Triage Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 700]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "high-value-check",
+              "leftValue": "={{ $json.is_high_value }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-tier-split",
+      "name": "High Value vs Low Value Split",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 700]
+    },
+    {
+      "parameters": {
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.groqApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-4-scout-17b-16e-instruct\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Generate a witty, brief, authentic social media reply for Huzaifa. His voice: technically sharp, warm, never cringe. Max 2 sentences. No emojis unless very natural.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Comment received: {{ $json.inbound.message }}\\nSuggested approach: {{ $json.triage.suggested_reply }}\\n\\nOutput ONLY the reply text, nothing else.\"\n    }\n  ],\n  \"temperature\": 0.8,\n  \"max_tokens\": 150\n}",
+        "options": {}
+      },
+      "id": "node-low-value-reply",
+      "name": "Low Value: Quick Reply Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 600],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "groq-api-key",
+          "name": "Groq API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst replyText = response.choices?.[0]?.message?.content || $json.triage?.suggested_reply || 'Great point!';\n\nreturn [{ json: { reply: replyText, type: 'low_value_reply' } }];"
+      },
+      "id": "node-format-low-reply",
+      "name": "Format Low-Value Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// High-value engagement: build priority notification for WhatsApp\nconst triage = $json.triage;\nconst inbound = $json.inbound;\n\nconst notification = `🔴 *HIGH-VALUE ENGAGEMENT ALERT*\n\n👤 *Who:* ${inbound.sender_name || 'Unknown'}\n📋 *Profile:* ${triage.who_is_this}\n🎯 *Intent:* ${triage.intent?.toUpperCase()}\n⚡ *Urgency:* ${triage.urgency?.replace(/_/g,' ').toUpperCase()}\n\n💬 *Their message:*\n\"${(inbound.message || '').substring(0, 300)}\"\n\n✍️ *Suggested Reply:*\n${triage.suggested_reply}\n\n${triage.draft_dm ? '📩 *Suggested DM:*\\n' + triage.draft_dm : ''}\n\n⚠️ Action needed: Reply within ${triage.urgency === 'immediate' ? '1 hour' : triage.urgency === 'today' ? '24 hours' : '3 days'}`;\n\nreturn [{ \n  json: { \n    ...($json),\n    whatsappNotification: notification,\n    type: 'high_value_alert'\n  } \n}];"
+      },
+      "id": "node-build-hv-notification",
+      "name": "Build High-Value Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 800]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.callmebot.com/whatsapp.php?phone=YOUR_PHONE_NUMBER&text={{ encodeURIComponent($json.whatsappNotification) }}&apikey=YOUR_CALLMEBOT_APIKEY",
+        "options": {}
+      },
+      "id": "node-whatsapp-hv-alert",
+      "name": "WhatsApp: Priority Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 800]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ new Date().toISOString() }}",
+            "Name": "={{ $json.inbound?.sender_name }}",
+            "Platform": "={{ $json.inbound?.platform }}",
+            "Message": "={{ $json.inbound?.message }}",
+            "Intent": "={{ $json.triage?.intent }}",
+            "Who_Is_This": "={{ $json.triage?.who_is_this }}",
+            "Urgency": "={{ $json.triage?.urgency }}",
+            "Suggested_Reply": "={{ $json.triage?.suggested_reply }}",
+            "Draft_DM": "={{ $json.triage?.draft_dm }}",
+            "Status": "=NEW_LEAD"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-sheets-leads",
+      "name": "Log Lead to Google Sheets (Leads)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1440, 800],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-sheets-creds",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.groqApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-4-scout-17b-16e-instruct\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Perform sentiment analysis on social media comments. Output ONLY valid JSON.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Analyze sentiment for these recent comments/interactions from Huzaifa's posts:\\n{{ JSON.stringify($json.body.comments || []).substring(0, 2000) }}\\n\\nOutput JSON with keys:\\n- overall_sentiment: positive/neutral/negative\\n- sentiment_score: -100 to 100\\n- trending_topics_in_comments: array of strings\\n- negative_comments_count: number\\n- positive_comments_count: number\\n- top_themes: array of strings\\n- audience_health: good/concerning/critical\\n- recommended_action: what Huzaifa should do based on engagement patterns\"\n    }\n  ],\n  \"temperature\": 0.2,\n  \"max_tokens\": 600\n}",
+        "options": {}
+      },
+      "id": "node-sentiment-analysis",
+      "name": "Sentiment Analysis (Llama 4)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 900],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "groq-api-key",
+          "name": "Groq API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.groqApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-4-scout-17b-16e-instruct\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the Community Manager for Huzaifa. Identify key players in AI, HealthTech, and Space Tech niches to engage with proactively. Huzaifa's niches: AI in Healthcare, AI automation, Pashto NLP, n8n/low-code AI, Pakistan tech ecosystem. His brand is authentic, technical, entrepreneurial.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Based on current trending topics: {{ JSON.stringify($('Apify - Fetch Scraped Results').first()?.json || {}).substring(0, 2000) }}\\n\\nGenerate 3 proactive engagement opportunities. For each key player/conversation Huzaifa should initiate this week, output JSON array with: target_account, platform, why_engage, opening_comment (authentic, non-cringe, adds real value), connection_angle\"\n    }\n  ],\n  \"temperature\": 0.7,\n  \"max_tokens\": 1000\n}",
+        "options": {}
+      },
+      "id": "node-community-manager",
+      "name": "Proactive Community Manager",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2880, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "groq-api-key",
+          "name": "Groq API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet communityText = '';\n\ntry {\n  communityText = response.choices[0].message.content;\n} catch(e) {\n  communityText = JSON.stringify(response);\n}\n\nlet opportunities = [];\ntry {\n  const jsonMatch = communityText.match(/\\[[\\s\\S]*\\]/);\n  if (jsonMatch) {\n    opportunities = JSON.parse(jsonMatch[0]);\n  }\n} catch(e) {\n  opportunities = [{ raw: communityText }];\n}\n\nconst whatsappMsg = `🌐 *Proactive Engagement Opportunities*\\n\\n` + \n  opportunities.slice(0,3).map((opp, i) => \n    `${i+1}. *${opp.target_account || 'Unknown'}* (${opp.platform || 'N/A'})\\n📌 ${opp.why_engage || ''}\\n💬 \"${(opp.opening_comment || '').substring(0, 150)}\"`\n  ).join('\\n\\n');\n\nreturn [{ json: { opportunities, whatsappMsg } }];"
+      },
+      "id": "node-parse-community",
+      "name": "Parse Community Opportunities",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3120, 500]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.callmebot.com/whatsapp.php?phone=YOUR_PHONE_NUMBER&text={{ encodeURIComponent($json.whatsappMsg) }}&apikey=YOUR_CALLMEBOT_APIKEY",
+        "options": {}
+      },
+      "id": "node-whatsapp-community",
+      "name": "WhatsApp: Community Targets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3360, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'received', message: 'Webhook processed', timestamp: new Date().toISOString() }) }}"
+      },
+      "id": "node-webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [480, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'received', engagement: 'processing', timestamp: new Date().toISOString() }) }}"
+      },
+      "id": "node-engagement-response",
+      "name": "Engagement Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [240, 1050]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rejection path — log that content needs revision\nconst data = $input.first().json;\nconst reasons = data.validation?.red_flags || ['Content needs revision'];\n\nconst msg = `⚠️ Ghost-Founder v3.0 — Content Revision Needed\\n\\nScore: ${data.validation?.validation_score || 'N/A'}/100\\n\\nIssues:\\n${Array.isArray(reasons) ? reasons.join('\\n') : reasons}\\n\\nCheck Google Sheets for full details.`;\n\nreturn [{ json: { ...data, revisionMsg: msg } }];"
+      },
+      "id": "node-revision-handler",
+      "name": "Revision: Log & Notify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3360, 200]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.callmebot.com/whatsapp.php?phone=YOUR_PHONE_NUMBER&text={{ encodeURIComponent($json.revisionMsg) }}&apikey=YOUR_CALLMEBOT_APIKEY",
+        "options": {}
+      },
+      "id": "node-whatsapp-revision",
+      "name": "WhatsApp: Revision Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3600, 100]
+    }
+  ],
+  "connections": {
+    "Daily Strategy Trigger": {
+      "main": [
+        [
+          {
+            "node": "Apify - Scrape Trending Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual/WhatsApp Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check !Approve Signal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check !Approve Signal": {
+      "main": [
+        [
+          {
+            "node": "Fetch Approved Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify - Scrape Trending Topics": {
+      "main": [
+        [
+          {
+            "node": "Wait for Apify Actor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Apify Actor": {
+      "main": [
+        [
+          {
+            "node": "Apify - Fetch Scraped Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify - Fetch Scraped Results": {
+      "main": [
+        [
+          {
+            "node": "The Strategist (Claude Opus 4.6)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "The Strategist (Claude Opus 4.6)": {
+      "main": [
+        [
+          {
+            "node": "Parse Strategist Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Strategist Output": {
+      "main": [
+        [
+          {
+            "node": "The Archivist (Gemini Pro)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "The Archivist (Gemini Pro)": {
+      "main": [
+        [
+          {
+            "node": "Parse Archivist Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Archivist Output": {
+      "main": [
+        [
+          {
+            "node": "Creative Agent (Llama 4 on Groq)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Creative Agent (Llama 4 on Groq)": {
+      "main": [
+        [
+          {
+            "node": "Parse Creative Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Creative Output": {
+      "main": [
+        [
+          {
+            "node": "Validator Agent (Shadow-Ban Check)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validator Agent (Shadow-Ban Check)": {
+      "main": [
+        [
+          {
+            "node": "Build WhatsApp Preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build WhatsApp Preview": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets (Content-Queue)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send WhatsApp Preview",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Proactive Community Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Preview": {
+      "main": [
+        [
+          {
+            "node": "Approval Gate (Auto or Manual)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval Gate (Auto or Manual)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Approved Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Revision: Log & Notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Approved Content": {
+      "main": [
+        [
+          {
+            "node": "Post to LinkedIn",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to X (Twitter) - Thread Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to X (Twitter) - Thread Start": {
+      "main": [
+        [
+          {
+            "node": "X Thread - Tweet 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "X Thread - Tweet 2": {
+      "main": [
+        [
+          {
+            "node": "X Thread - Tweet 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "X Thread - Tweet 3": {
+      "main": [
+        [
+          {
+            "node": "X Thread - Tweet 4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "X Thread - Tweet 4": {
+      "main": [
+        [
+          {
+            "node": "X Thread - Tweet 5 (CTA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "X Thread - Tweet 5 (CTA)": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet: Mark Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet: Mark Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sheet: Mark Published": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp: Publish Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Engagement Webhook (Comments/DMs)": {
+      "main": [
+        [
+          {
+            "node": "Smart Triage (Llama 4 - Fast)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sentiment Analysis (Llama 4)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Engagement Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smart Triage (Llama 4 - Fast)": {
+      "main": [
+        [
+          {
+            "node": "Parse Triage Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Triage Result": {
+      "main": [
+        [
+          {
+            "node": "High Value vs Low Value Split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Value vs Low Value Split": {
+      "main": [
+        [
+          {
+            "node": "Build High-Value Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Low Value: Quick Reply Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build High-Value Notification": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp: Priority Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp: Priority Alert": {
+      "main": [
+        [
+          {
+            "node": "Log Lead to Google Sheets (Leads)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Low Value: Quick Reply Draft": {
+      "main": [
+        [
+          {
+            "node": "Format Low-Value Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Proactive Community Manager": {
+      "main": [
+        [
+          {
+            "node": "Parse Community Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Community Opportunities": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp: Community Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Revision: Log & Notify": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp: Revision Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2026-04-05T00:00:00.000Z",
+      "updatedAt": "2026-04-05T00:00:00.000Z",
+      "id": "ghost-founder-tag",
+      "name": "ghost-founder-v3"
+    }
+  ],
+  "triggerCount": 2,
+  "updatedAt": "2026-04-05T00:00:00.000Z",
+  "versionId": "ghost-founder-v3.0"
+}
